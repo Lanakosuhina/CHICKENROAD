@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chicken Runner</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: sans-serif;
+            z-index: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="hud">💰: <span id="score">0</span></div>
+    <div id="loading">Загрузка курицы...</div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.min.js';
+        class Player {
+            constructor(scene) {
+                this.scene = scene;
+                this.mesh = null;
+                this.posX = 0;
+                this.targetX = 0;
+                this.speed = 0.2;
+                this.score = 0;
+                this.loadChicken();
+            }
+
+            async loadChicken() {
+                try {
+                    // Временный куб на время загрузки
+                    const tempGeo = new THREE.BoxGeometry(1, 1, 1);
+                    const tempMat = new THREE.MeshBasicMaterial({ color: 0xFF5722, wireframe: true });
+                    this.mesh = new THREE.Mesh(tempGeo, tempMat);
+                    this.scene.add(this.mesh);
+
+                    // Загружаем модель курицы
+                    const loader = new GLTFLoader();
+                    const modelUrl = './chicken.glb'; // Путь к модели курицы
+                    const gltf = await loader.loadAsync(modelUrl);
+
+                    this.scene.remove(this.mesh); // Удаляем временный куб
+                    this.mesh = gltf.scene;
+                    this.mesh.scale.set(0.02, 0.02, 0.02);
+                    this.mesh.position.y = 0.5;
+                    this.scene.add(this.mesh);
+
+                    document.getElementById('loading').style.display = 'none';
+                } catch (error) {
+                    console.error('Ошибка загрузки модели:', error);
+                    this.mesh.material = new THREE.MeshPhongMaterial({ color: 0xFFD700 });
+                    document.getElementById('loading').textContent = 'Курица не загрузилась, но игра работает!';
+                }
+            }
+
+            moveLeft() { this.targetX = Math.max(-2, this.targetX - 2); }
+            moveRight() { this.targetX = Math.min(2, this.targetX + 2); }
+
+            update() {
+                if (this.mesh) {
+                    this.posX = THREE.MathUtils.lerp(this.posX, this.targetX, this.speed);
+                    this.mesh.position.x = this.posX;
+                    this.mesh.rotation.y = Math.sin(Date.now() * 0.003) * 0.2;
+                    this.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.1;
+                }
+            }
+        }
+
+        // Остальной код игры остается без изменений
+        class Game {
+            constructor() {
+                this.scene = new THREE.Scene();
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load('./bg.jpg', (texture) => {
+                    texture.offset.y = -0.3;
+                    this.scene.background = texture;
+                });
+                this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
+                this.camera.position.set(0, 5, 5);
+                this.camera.lookAt(0, 0, -10);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(innerWidth, innerHeight);
+                document.body.appendChild(this.renderer.domElement);
+
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(5, 10, 7);
+                this.scene.add(light);
+                this.scene.add(new THREE.AmbientLight(0x404040));
+
+                const groundGeometry = new THREE.PlaneGeometry(7, 700);
+                const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x525252, side: THREE.DoubleSide });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = Math.PI / 2;
+                ground.position.z = -150;
+                this.scene.add(ground);
+
+                this.player = new Player(this.scene);
+                this.gates = [];
+                this.coins = [];
+
+                for (let i = 1; i <= 10; i++) {
+                    const z = -10 - i * 10;
+                    const type = ["+", "-", "×"][i % 3];
+                    const val = type == "+" ? 5 : (type == "-" ? 2 : 3);
+                    this.gates.push(new Gate(this.scene, type, val, z));
+                    this.coins.push(new Coin(this.scene, z + (-2 + Math.random() * 2)));
+                }
+
+                this.initControls();
+                window.addEventListener('resize', () => this.onResize());
+                this.speed = 0.085;
+                this.loop();
+            }
+
+            initControls() {
+                window.addEventListener('keydown', e => {
+                    if (e.code == 'ArrowLeft') this.player.moveLeft();
+                    if (e.code == 'ArrowRight') this.player.moveRight();
+                });
+
+                let x0;
+                window.addEventListener('touchstart', e => {
+                    x0 = e.touches[0].clientX;
+                });
+
+                window.addEventListener('touchend', e => {
+                    const dx = e.changedTouches[0].clientX - x0;
+                    if (dx > 10) this.player.moveRight();
+                    if (dx < -10) this.player.moveLeft();
+                });
+            }
+
+            onResize() {
+                this.camera.aspect = innerWidth / innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(innerWidth, innerHeight);
+            }
+
+            loop() {
+                requestAnimationFrame(() => this.loop());
+                this.camera.position.z -= this.speed;
+                this.player.mesh.position.z = this.camera.position.z - 5;
+                this.player.update();
+                this.gates.forEach(gate => gate.mesh.position.z += this.speed);
+                this.coins.forEach(coin => coin.mesh.position.z += this.speed);
+
+                this.gates.forEach((gate, i) => {
+                    if (gate.intersects(this.player)) {
+                        this.scene.remove(gate.mesh);
+                        this.gates.splice(i, 1);
+                    }
+                });
+
+                this.coins.forEach((coin, i) => {
+                    if (coin.intersects(this.player)) {
+                        this.scene.remove(coin.mesh);
+                        this.coins.splice(i, 1);
+                    }
+                });
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        new Game();
+    </script>
+
+</body>
+
+</html>

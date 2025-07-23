@@ -1,0 +1,84 @@
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+ </head>
+ <body>
+ <script>
+ // Инициализация сцены, камеры и рендерера
+        const fov = 75;
+        const aspect = window.innerWidth / window.innerHeight;
+        const near = 0.1;
+        const far = 1000;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+        camera.position.set(0, 50, 0);
+        camera.up.set(0, 0, 1);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Свет
+        const color = 0xFFFFFF;
+        const intensity = 500;
+        const light = new THREE.PointLight(color, intensity);
+        scene.add(light);
+
+        // Сфера
+        const objects = [];
+
+        const radius = 1;
+        const widthSegments = 6;
+        const heightSegments = 6;
+        const sphereGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+
+        const solarSystem = new THREE.Object3D();
+        scene.add(solarSystem);
+        objects.push(solarSystem);
+
+        const sunMaterial = new THREE.MeshPhongMaterial({ emissive: 0xffff00 });
+        const sunMesh = new THREE.Mesh(sphereGeometry, sunMaterial);
+        sunMesh.scale.set(5, 5, 5);
+        solarSystem.add(sunMesh);
+        objects.push(sunMesh);
+
+        const earthOrbit = new THREE.Object3D();
+        earthOrbit.position.x = 14;
+        solarSystem.add(earthOrbit);
+        objects.push(earthOrbit);
+
+        const earthMaterial = new THREE.MeshPhongMaterial({ color: 0x2233FF, emissive: 0x112244 });
+        const earthMesh = new THREE.Mesh(sphereGeometry, earthMaterial);
+        earthMesh.position.x = 6;
+        earthOrbit.add(earthMesh);
+        objects.push(earthMesh);
+
+        const moonOrbit = new THREE.Object3D();
+        moonOrbit.position.x = 2;
+        earthOrbit.add(moonOrbit);
+
+        const moonMaterial = new THREE.MeshPhongMaterial({ color: 0x888888, emissive: 0x222222 });
+        const moonMesh = new THREE.Mesh(sphereGeometry, moonMaterial);
+        moonMesh.scale.set(.5, .5, .5);
+        moonOrbit.add(moonMesh);
+        objects.push(moonMesh);
+
+        // Рендер
+        function animate() {
+            requestAnimationFrame(animate);
+            objects.forEach((obj) => {
+                obj.rotation.y += 0.06;
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+    </script>
+</body>
+ </html>

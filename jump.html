@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Runner Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-size: 16px;
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-family: Arial, sans-serif;
+            font-size: 200%;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 1;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+</head>
+
+<body>
+
+    <div id="hud">
+        💰 Coins: <span id="coins">0</span><br>
+        ❤️ Lives: <span id="lives">3</span>
+    </div>
+
+    <script>
+        class Player {
+            constructor(scene) {
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(0, 0.5, 0);
+                scene.add(this.mesh);
+
+                this.velocityY = 0;
+                this.isJumping = false;
+            }
+
+            moveLeft() {
+                if (this.mesh.position.x > -2) this.mesh.position.x -= 2;
+            }
+
+            moveRight() {
+                if (this.mesh.position.x < 2) this.mesh.position.x += 2;
+            }
+
+            jump() {
+                if (!this.isJumping) {
+                    this.velocityY = 0.2;
+                    this.isJumping = true;
+                }
+            }
+
+            update(gravity) {
+                this.mesh.position.y += this.velocityY;
+                this.velocityY += gravity;
+
+                if (this.mesh.position.y <= 0.5) {
+                    this.mesh.position.y = 0.5;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+            }
+        }
+
+        class Obstacle {
+            constructor(scene) {
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(this.randomX(), 0.5, -100);
+                scene.add(this.mesh);
+                this.scene = scene;
+            }
+
+            randomX() {
+                const positions = [-2, 0, 2];
+                return positions[Math.floor(Math.random() * positions.length)];
+            }
+
+            update(speed) {
+                this.mesh.position.z += speed;
+            }
+
+            isOffscreen(cameraZ) {
+                return this.mesh.position.z > cameraZ + 5;
+            }
+
+            intersects(player) {
+                const dx = Math.abs(this.mesh.position.x - player.mesh.position.x);
+                const dy = Math.abs(this.mesh.position.y - player.mesh.position.y);
+                const dz = Math.abs(this.mesh.position.z - player.mesh.position.z);
+                return dx < 0.9 && dy < 0.9 && dz < 0.9;
+            }
+
+            remove() {
+                this.scene.remove(this.mesh);
+            }
+        }
+
+        class Coin {
+            constructor(scene) {
+                const geometry = new THREE.SphereGeometry(0.3, 12, 12);
+                const material = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(this.randomX(), 0.5, -100);
+                scene.add(this.mesh);
+                this.scene = scene;
+            }
+
+            randomX() {
+                const positions = [-2, 0, 2];
+                return positions[Math.floor(Math.random() * positions.length)];
+            }
+
+            update(speed) {
+                this.mesh.position.z += speed;
+            }
+
+            isOffscreen(cameraZ) {
+                return this.mesh.position.z > cameraZ + 5;
+            }
+
+            intersects(player) {
+                const dx = Math.abs(this.mesh.position.x - player.mesh.position.x);
+                const dy = Math.abs(this.mesh.position.y - player.mesh.position.y);
+                const dz = Math.abs(this.mesh.position.z - player.mesh.position.z);
+                return dx < 0.7 && dy < 0.7 && dz < 0.7;
+            }
+
+            remove() {
+                this.scene.remove(this.mesh);
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 5, 5);
+                this.camera.lookAt(0, 0, -10);
+
+                this.renderer = new THREE.WebGLRenderer();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(this.renderer.domElement);
+
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(0, 10, 10);
+                this.scene.add(light);
+
+                const ambient = new THREE.AmbientLight(0x404040);
+                this.scene.add(ambient);
+
+                const groundGeometry = new THREE.BoxGeometry(20, 1, 200);
+                const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x555555 });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.position.y =   -1;
+                this.scene.add(ground);
+
+
+                this.player = new Player(this.scene);
+                this.obstacles = [];
+                this.coins = [];
+
+                this.gravity = -0.01;
+                this.speed = 0.3;
+                this.spawnInterval = 1500;
+                this.coinInterval = 2000;
+
+                this.lives = 3;
+                this.coinsCollected = 0;
+
+                this.initControls();
+                this.startSpawning();
+                this.animate();
+            }
+
+            initControls() {
+                window.addEventListener("keydown", (e) => {
+                    if (e.code === "ArrowLeft") this.player.moveLeft();
+                    if (e.code === "ArrowRight") this.player.moveRight();
+                    if (e.code === "Space" || e.code === "ArrowUp") this.player.jump();
+                });
+
+                let touchStartX = 0, touchStartY = 0;
+                window.addEventListener("touchstart", (e) => {
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
+                });
+
+                window.addEventListener("touchend", (e) => {
+                    const dx = e.changedTouches[0].clientX - touchStartX;
+                    const dy = e.changedTouches[0].clientY - touchStartY;
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        if (dx > 30) this.player.moveRight();
+                        else if (dx < -30) this.player.moveLeft();
+                    } else {
+                        if (dy < -30) this.player.jump();
+                    }
+                });
+            }
+
+            startSpawning() {
+                setInterval(() => {
+                    this.obstacles.push(new Obstacle(this.scene));
+                }, this.spawnInterval);
+
+                setInterval(() => {
+                    this.coins.push(new Coin(this.scene));
+                }, this.coinInterval);
+            }
+
+            updateHUD() {
+                document.getElementById('coins').textContent = this.coinsCollected;
+                document.getElementById('lives').textContent = this.lives;
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                this.player.update(this.gravity);
+
+                // Обработка препятствий
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    const obs = this.obstacles[i];
+                    obs.update(this.speed);
+
+                    if (obs.isOffscreen(this.camera.position.z)) {
+                        obs.remove();
+                        this.obstacles.splice(i, 1);
+                    } else if (obs.intersects(this.player)) {
+                        obs.remove();
+                        this.obstacles.splice(i, 1);
+                        this.lives--;
+                        this.updateHUD();
+
+                        if (this.lives <= 0) {
+                            alert("💀 Все жизни потрачены. Игра окончена!");
+                            window.location.reload();
+                        }
+                    }
+                }
+
+                // Обработка монет
+                for (let i = this.coins.length - 1; i >= 0; i--) {
+                    const coin = this.coins[i];
+                    coin.update(this.speed);
+
+                    if (coin.isOffscreen(this.camera.position.z)) {
+                        coin.remove();
+                        this.coins.splice(i, 1);
+                    } else if (coin.intersects(this.player)) {
+                        coin.remove();
+                        this.coins.splice(i, 1);
+                        this.coinsCollected++;
+                        this.updateHUD();
+                    }
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        new Game();
+    </script>
+
+</body>
+
+</html>
