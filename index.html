@@ -21,74 +21,159 @@
             z-index: 1;
         }
     </style>
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 
 <body>
 
     <div id="hud">💰: <span id="score">0</span></div>
-    <div id="loading">Загрузка курицы...</div>
 
-    <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.min.js';
+    <script>
         class Player {
             constructor(scene) {
-                this.scene = scene;
-                this.mesh = null;
+                this.group = new THREE.Group();
+
+                // Тело
+                const body = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.4, 16, 16),
+                    new THREE.MeshStandardMaterial({ color: 0xffffcc })
+                );
+                body.position.y = 0.4;
+                this.group.add(body);
+
+                // Гребешок
+                const comb = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.1),
+                    new THREE.MeshStandardMaterial({ color: 0xff0000 })
+                );
+                comb.position.set(0, 0.8, 0);
+                this.group.add(comb);
+
+                // Клюв
+                const beak = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.08, 0.15, 8),
+                    new THREE.MeshStandardMaterial({ color: 0xff9900 })
+                );
+                beak.rotation.x = Math.PI / 2;
+                beak.position.set(0, 0.45, 0.38);
+                this.group.add(beak);
+
+                // Левое крыло
+                const leftWing = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.3, 0.2),
+                    new THREE.MeshStandardMaterial({ color: 0xffffcc })
+                );
+                leftWing.position.set(-0.4, 0.4, 0);
+                this.group.add(leftWing);
+
+                // Правое крыло
+                const rightWing = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.05, 0.3, 0.2),
+                    new THREE.MeshStandardMaterial({ color: 0xffffcc })
+                );
+                rightWing.position.set(0.4, 0.4, 0);
+                this.group.add(rightWing);
+
+                // Левая нога
+                const leftLeg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 0.3),
+                    new THREE.MeshStandardMaterial({ color: 0xff9900 })
+                );
+                leftLeg.position.set(-0.15, 0.0, 0);
+                this.group.add(leftLeg);
+
+                // Правая нога
+                const rightLeg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 0.3),
+                    new THREE.MeshStandardMaterial({ color: 0xff9900 })
+                );
+                rightLeg.position.set(0.15, 0.0, 0);
+                this.group.add(rightLeg);
+                // Глаза
+const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+
+const leftEye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.02, 8, 8),
+    eyeMaterial
+);
+leftEye.position.set(-0.12, 0.55, 0.35);
+this.group.add(leftEye);
+
+const rightEye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.02, 8, 8),
+    eyeMaterial
+);
+rightEye.position.set(0.12, 0.55, 0.35);
+this.group.add(rightEye);
+
+
+                this.group.position.z = 0;
+                this.group.position.y = 0.1;
+                scene.add(this.group);
+
                 this.posX = 0;
                 this.targetX = 0;
                 this.speed = 0.2;
                 this.score = 0;
-                this.loadChicken();
             }
 
-            async loadChicken() {
-                try {
-                    // Временный куб на время загрузки
-                    const tempGeo = new THREE.BoxGeometry(1, 1, 1);
-                    const tempMat = new THREE.MeshBasicMaterial({ color: 0xFF5722, wireframe: true });
-                    this.mesh = new THREE.Mesh(tempGeo, tempMat);
-                    this.scene.add(this.mesh);
-
-                    // Загружаем модель курицы
-                    const loader = new GLTFLoader();
-                    const modelUrl = './chicken.glb'; // Путь к модели курицы
-                    const gltf = await loader.loadAsync(modelUrl);
-
-                    this.scene.remove(this.mesh); // Удаляем временный куб
-                    this.mesh = gltf.scene;
-                    this.mesh.scale.set(0.02, 0.02, 0.02);
-                    this.mesh.position.y = 0.5;
-                    this.scene.add(this.mesh);
-
-                    document.getElementById('loading').style.display = 'none';
-                } catch (error) {
-                    console.error('Ошибка загрузки модели:', error);
-                    this.mesh.material = new THREE.MeshPhongMaterial({ color: 0xFFD700 });
-                    document.getElementById('loading').textContent = 'Курица не загрузилась, но игра работает!';
-                }
+            moveLeft() {
+                this.targetX = Math.max(-1, this.targetX - 1);
             }
 
-            moveLeft() { this.targetX = Math.max(-2, this.targetX - 2); }
-            moveRight() { this.targetX = Math.min(2, this.targetX + 2); }
+            moveRight() {
+                this.targetX = Math.min(1, this.targetX + 1);
+            }
 
             update() {
-                if (this.mesh) {
-                    this.posX = THREE.MathUtils.lerp(this.posX, this.targetX, this.speed);
-                    this.mesh.position.x = this.posX;
-                    this.mesh.rotation.y = Math.sin(Date.now() * 0.003) * 0.2;
-                    this.mesh.position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.1;
-                }
+                this.posX = THREE.MathUtils.lerp(this.posX, this.targetX, this.speed);
+                this.group.position.x = this.posX;
+
+                // Покачивание
+                this.group.rotation.y = Math.sin(Date.now() * 0.005) * 0.2;
             }
         }
 
-        // Остальной код игры остается без изменений
+        class Gate {
+            constructor(scene, type, value, z) {
+                const geo = new THREE.BoxGeometry(4, 1, 0.5);
+                const mat = new THREE.MeshPhongMaterial({ color: type == '+' ? 0x00ff00 : 0xff0000 });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.position.set(0, 0.5, z);
+                scene.add(this.mesh);
+                this.type = type;
+                this.value = value;
+            }
+
+            intersects(player) {
+                return Math.abs(this.mesh.position.z - player.group.position.z) < 1
+                    && Math.abs(player.posX - 0) < 1;
+            }
+        }
+
+        class Coin {
+            constructor(scene, z) {
+                const geo = new THREE.SphereGeometry(0.3, 8, 8);
+                const mat = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.position.set([-2, 0, 2][Math.floor(Math.random() * 3)], 0.5, z);
+                scene.add(this.mesh);
+            }
+
+            intersects(player) {
+                return player.mesh
+                    && Math.abs(this.mesh.position.z - player.group.position.z) < 1
+                    && Math.abs(this.mesh.position.x - player.posX) < 1;
+            }
+        }
+
         class Game {
             constructor() {
                 this.scene = new THREE.Scene();
                 const textureLoader = new THREE.TextureLoader();
                 textureLoader.load('./bg.jpg', (texture) => {
-                    texture.offset.y = -0.3;
+                    texture.offset.y = -0.2; // Смещаем текстуру вверх (экспериментируйте со значением)
                     this.scene.background = texture;
                 });
                 this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
@@ -102,19 +187,21 @@
                 const light = new THREE.DirectionalLight(0xffffff, 1);
                 light.position.set(5, 10, 7);
                 this.scene.add(light);
-                this.scene.add(new THREE.AmbientLight(0x404040));
+                this.scene.add(new THREE.AmbientLight(0x000000));
 
-                const groundGeometry = new THREE.PlaneGeometry(7, 700);
-                const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x525252, side: THREE.DoubleSide });
+                // Создаем плоскость для "земли"
+                const groundGeometry = new THREE.PlaneGeometry(20, 700);
+                const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x555555, side: THREE.DoubleSide });
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
                 ground.rotation.x = Math.PI / 2;
-                ground.position.z = -150;
+                ground.position.z = -50;
                 this.scene.add(ground);
 
                 this.player = new Player(this.scene);
                 this.gates = [];
                 this.coins = [];
 
+                // Создаем несколько препятствий и монет
                 for (let i = 1; i <= 10; i++) {
                     const z = -10 - i * 10;
                     const type = ["+", "-", "×"][i % 3];
@@ -130,20 +217,26 @@
             }
 
             initControls() {
-                window.addEventListener('keydown', e => {
-                    if (e.code == 'ArrowLeft') this.player.moveLeft();
-                    if (e.code == 'ArrowRight') this.player.moveRight();
+                window.addEventListener("keydown", (e) => {
+                    if (e.code === "ArrowLeft") this.player.moveLeft();
+                    if (e.code === "ArrowRight") this.player.moveRight();
+                    if (e.code === "Space" || e.code === "ArrowUp") this.player.jump();
                 });
 
-                let x0;
-                window.addEventListener('touchstart', e => {
-                    x0 = e.touches[0].clientX;
+                let touchStartX = 0, touchStartY = 0;
+                window.addEventListener("touchstart", (e) => {
+                    touchStartX = e.touches[0].clientX;
+                    touchStartY = e.touches[0].clientY;
                 });
 
-                window.addEventListener('touchend', e => {
-                    const dx = e.changedTouches[0].clientX - x0;
-                    if (dx > 10) this.player.moveRight();
-                    if (dx < -10) this.player.moveLeft();
+                window.addEventListener("touchend", (e) => {
+                    const dx = e.changedTouches[0].clientX - touchStartX;
+                    const dy = e.changedTouches[0].clientY - touchStartY;
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        if (dx > 30) this.player.moveRight();
+                        else if (dx < -30) this.player.moveLeft();
+                    }
                 });
             }
 
@@ -155,9 +248,13 @@
 
             loop() {
                 requestAnimationFrame(() => this.loop());
+
+                // Двигаем камеру вперед
                 this.camera.position.z -= this.speed;
-                this.player.mesh.position.z = this.camera.position.z - 5;
+                this.player.group.position.z = this.camera.position.z - 5;
                 this.player.update();
+
+                // Двигаем ворота и монеты
                 this.gates.forEach(gate => gate.mesh.position.z += this.speed);
                 this.coins.forEach(coin => coin.mesh.position.z += this.speed);
 
