@@ -91,21 +91,21 @@
                 rightLeg.position.set(0.15, 0.0, 0);
                 this.group.add(rightLeg);
                 // Глаза
-const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+                const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
 
-const leftEye = new THREE.Mesh(
-    new THREE.SphereGeometry(0.02, 8, 8),
-    eyeMaterial
-);
-leftEye.position.set(-0.12, 0.55, 0.35);
-this.group.add(leftEye);
+                const leftEye = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.02, 8, 8),
+                    eyeMaterial
+                );
+                leftEye.position.set(-0.12, 0.55, 0.35);
+                this.group.add(leftEye);
 
-const rightEye = new THREE.Mesh(
-    new THREE.SphereGeometry(0.02, 8, 8),
-    eyeMaterial
-);
-rightEye.position.set(0.12, 0.55, 0.35);
-this.group.add(rightEye);
+                const rightEye = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.02, 8, 8),
+                    eyeMaterial
+                );
+                rightEye.position.set(0.12, 0.55, 0.35);
+                this.group.add(rightEye);
 
 
                 this.group.position.z = 0;
@@ -135,22 +135,76 @@ this.group.add(rightEye);
             }
         }
 
-        class Gate {
-            constructor(scene, type, value, z) {
-                const geo = new THREE.BoxGeometry(4, 1, 0.5);
-                const mat = new THREE.MeshPhongMaterial({ color: type == '+' ? 0x00ff00 : 0xff0000 });
-                this.mesh = new THREE.Mesh(geo, mat);
-                this.mesh.position.set(0, 0.5, z);
-                scene.add(this.mesh);
-                this.type = type;
-                this.value = value;
-            }
+ class Gate {
+    constructor(scene, type, value, z) {
+        this.group = new THREE.Group();
+        this.type = type;
+        this.value = value;
 
-            intersects(player) {
-                return Math.abs(this.mesh.position.z - player.group.position.z) < 1
-                    && Math.abs(player.posX - 0) < 1;
+        const gateHeight = 1;
+        const gateDepth = 0.5;
+        const halfWidth = 2;
+
+        // Вершинный шейдер (передаёт позицию)
+        const vertexShader = `
+            varying vec3 vPosition;
+            void main() {
+                vPosition = position;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
             }
-        }
+        `;
+
+        // Фрагментный шейдер (создаёт вертикальный градиент)
+        const makeFragmentShader = (baseColorHex) => {
+            const color = new THREE.Color(baseColorHex);
+            return `
+                varying vec3 vPosition;
+                void main() {
+                    float alpha = smoothstep(-0.5, 0.5, vPosition.y); // от 0 (внизу) до 1 (вверху)
+                    alpha = 1.0 - alpha; // инвертируем: внизу плотнее
+                    gl_FragColor = vec4(${color.r}, ${color.g}, ${color.b}, alpha * 0.8);
+                }
+            `;
+        };
+
+        // Левая часть (зелёный градиент)
+        const leftMaterial = new THREE.ShaderMaterial({
+            vertexShader,
+            fragmentShader: makeFragmentShader(0x00ff00),
+            transparent: true
+        });
+        const leftGeo = new THREE.BoxGeometry(halfWidth, gateHeight, gateDepth);
+        const leftMesh = new THREE.Mesh(leftGeo, leftMaterial);
+        leftMesh.position.x = -halfWidth / 2;
+
+        // Правая часть (красный градиент)
+        const rightMaterial = new THREE.ShaderMaterial({
+            vertexShader,
+            fragmentShader: makeFragmentShader(0xff0000),
+            transparent: true
+        });
+        const rightGeo = new THREE.BoxGeometry(halfWidth, gateHeight, gateDepth);
+        const rightMesh = new THREE.Mesh(rightGeo, rightMaterial);
+        rightMesh.position.x = halfWidth / 2;
+
+        // Сборка
+        this.group.add(leftMesh);
+        this.group.add(rightMesh);
+        this.group.position.set(0, 0.5, z);
+
+        scene.add(this.group);
+    }
+
+    intersects(player) {
+        return Math.abs(this.group.position.z - player.group.position.z) < 1
+            && Math.abs(player.posX - 0) < 1;
+    }
+
+    removeFromScene(scene) {
+        scene.remove(this.group);
+    }
+}
+
 
         class Coin {
             constructor(scene, z) {
@@ -190,11 +244,11 @@ this.group.add(rightEye);
                 this.scene.add(new THREE.AmbientLight(0x000000));
 
                 // Создаем плоскость для "земли"
-                const groundGeometry = new THREE.PlaneGeometry(20, 700);
+                const groundGeometry = new THREE.PlaneGeometry(5, 1000);
                 const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x555555, side: THREE.DoubleSide });
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
                 ground.rotation.x = Math.PI / 2;
-                ground.position.z = -50;
+                ground.position.z = -90;
                 this.scene.add(ground);
 
                 this.player = new Player(this.scene);
@@ -212,7 +266,7 @@ this.group.add(rightEye);
 
                 this.initControls();
                 window.addEventListener('resize', () => this.onResize());
-                this.speed = 0.085;
+                this.speed = 0.065;
                 this.loop();
             }
 
@@ -255,7 +309,7 @@ this.group.add(rightEye);
                 this.player.update();
 
                 // Двигаем ворота и монеты
-                this.gates.forEach(gate => gate.mesh.position.z += this.speed);
+                this.gates.forEach(gate => gate.group.position.z += this.speed);
                 this.coins.forEach(coin => coin.mesh.position.z += this.speed);
 
                 this.gates.forEach((gate, i) => {
