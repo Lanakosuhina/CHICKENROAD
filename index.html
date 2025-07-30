@@ -34,7 +34,6 @@
             constructor(scene) {
                 this.group = new THREE.Group();
 
-                // Тело
                 const body = new THREE.Mesh(
                     new THREE.SphereGeometry(0.4, 16, 16),
                     new THREE.MeshStandardMaterial({ color: 0xffffcc })
@@ -42,7 +41,6 @@
                 body.position.y = 0.4;
                 this.group.add(body);
 
-                // Гребешок
                 const comb = new THREE.Mesh(
                     new THREE.SphereGeometry(0.1),
                     new THREE.MeshStandardMaterial({ color: 0xff0000 })
@@ -50,7 +48,6 @@
                 comb.position.set(0, 0.8, 0);
                 this.group.add(comb);
 
-                // Клюв
                 const beak = new THREE.Mesh(
                     new THREE.ConeGeometry(0.08, 0.15, 8),
                     new THREE.MeshStandardMaterial({ color: 0xff9900 })
@@ -59,7 +56,6 @@
                 beak.position.set(0, 0.45, 0.38);
                 this.group.add(beak);
 
-                // Левое крыло
                 const leftWing = new THREE.Mesh(
                     new THREE.BoxGeometry(0.05, 0.3, 0.2),
                     new THREE.MeshStandardMaterial({ color: 0xffffcc })
@@ -67,7 +63,6 @@
                 leftWing.position.set(-0.4, 0.4, 0);
                 this.group.add(leftWing);
 
-                // Правое крыло
                 const rightWing = new THREE.Mesh(
                     new THREE.BoxGeometry(0.05, 0.3, 0.2),
                     new THREE.MeshStandardMaterial({ color: 0xffffcc })
@@ -75,7 +70,6 @@
                 rightWing.position.set(0.4, 0.4, 0);
                 this.group.add(rightWing);
 
-                // Левая нога
                 const leftLeg = new THREE.Mesh(
                     new THREE.CylinderGeometry(0.05, 0.05, 0.3),
                     new THREE.MeshStandardMaterial({ color: 0xff9900 })
@@ -83,14 +77,13 @@
                 leftLeg.position.set(-0.15, 0.0, 0);
                 this.group.add(leftLeg);
 
-                // Правая нога
                 const rightLeg = new THREE.Mesh(
                     new THREE.CylinderGeometry(0.05, 0.05, 0.3),
                     new THREE.MeshStandardMaterial({ color: 0xff9900 })
                 );
                 rightLeg.position.set(0.15, 0.0, 0);
                 this.group.add(rightLeg);
-                // Глаза
+
                 const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
 
                 const leftEye = new THREE.Mesh(
@@ -116,6 +109,7 @@
                 this.targetX = 0;
                 this.speed = 0.2;
                 this.score = 0;
+                this.isJumping = false;
             }
 
             moveLeft() {
@@ -126,27 +120,45 @@
                 this.targetX = Math.min(1, this.targetX + 1);
             }
 
+            jump() {
+                if (!this.isJumping) {
+                    this.velocityY = 0.2;
+                    this.isJumping = true;
+                }
+            }
+
+
             update() {
                 this.posX = THREE.MathUtils.lerp(this.posX, this.targetX, this.speed);
                 this.group.position.x = this.posX;
 
-                // Покачивание
                 this.group.rotation.y = Math.sin(Date.now() * 0.005) * 0.2;
+
+                if (this.isJumping) {
+                    this.group.position.y += this.velocityY;
+                    this.velocityY -= 0.01;
+                    if (this.group.position.y <= 0.1) {
+                        this.group.position.y = 0.1;
+                        this.isJumping = false;
+                    }
+                } else {
+                    this.group.position.y = 0.1;
+                }
             }
         }
 
- class Gate {
-    constructor(scene, type, value, z) {
-        this.group = new THREE.Group();
-        this.type = type;
-        this.value = value;
+        class Gate {
+            constructor(scene, type, value, z) {
+                this.group = new THREE.Group();
+                this.type = type;
+                this.value = value;
 
-        const gateHeight = 1;
-        const gateDepth = 0.5;
-        const halfWidth = 2;
+                const gateHeight = 2;
+                const gateDepth = 0.5;
+                const halfWidth = 2;
 
-        // Вершинный шейдер (передаёт позицию)
-        const vertexShader = `
+                // Вершинный шейдер (передаёт позицию)
+                const vertexShader = `
             varying vec3 vPosition;
             void main() {
                 vPosition = position;
@@ -154,10 +166,10 @@
             }
         `;
 
-        // Фрагментный шейдер (создаёт вертикальный градиент)
-        const makeFragmentShader = (baseColorHex) => {
-            const color = new THREE.Color(baseColorHex);
-            return `
+                // Фрагментный шейдер (создаёт вертикальный градиент)
+                const makeFragmentShader = (baseColorHex) => {
+                    const color = new THREE.Color(baseColorHex);
+                    return `
                 varying vec3 vPosition;
                 void main() {
                     float alpha = smoothstep(-0.5, 0.5, vPosition.y); // от 0 (внизу) до 1 (вверху)
@@ -165,62 +177,62 @@
                     gl_FragColor = vec4(${color.r}, ${color.g}, ${color.b}, alpha * 0.8);
                 }
             `;
-        };
+                };
 
-        // Левая часть (зелёный градиент)
-        const leftMaterial = new THREE.ShaderMaterial({
-            vertexShader,
-            fragmentShader: makeFragmentShader(0x00ff00),
-            transparent: true
-        });
-        const leftGeo = new THREE.BoxGeometry(halfWidth, gateHeight, gateDepth);
-        const leftMesh = new THREE.Mesh(leftGeo, leftMaterial);
-        leftMesh.position.x = -halfWidth / 2;
+                const leftMaterial = new THREE.ShaderMaterial({
+                    vertexShader,
+                    fragmentShader: makeFragmentShader(0x4BFFFF),
+                    transparent: true
+                });
+                const leftGeo = new THREE.BoxGeometry(halfWidth, gateHeight, gateDepth);
+                const leftMesh = new THREE.Mesh(leftGeo, leftMaterial);
+                leftMesh.position.x = -halfWidth / 2;
 
-        // Правая часть (красный градиент)
-        const rightMaterial = new THREE.ShaderMaterial({
-            vertexShader,
-            fragmentShader: makeFragmentShader(0xff0000),
-            transparent: true
-        });
-        const rightGeo = new THREE.BoxGeometry(halfWidth, gateHeight, gateDepth);
-        const rightMesh = new THREE.Mesh(rightGeo, rightMaterial);
-        rightMesh.position.x = halfWidth / 2;
+                const rightMaterial = new THREE.ShaderMaterial({
+                    vertexShader,
+                    fragmentShader: makeFragmentShader(0xFF4BFF),
+                    transparent: true
+                });
+                const rightGeo = new THREE.BoxGeometry(halfWidth, gateHeight, gateDepth);
+                const rightMesh = new THREE.Mesh(rightGeo, rightMaterial);
+                rightMesh.position.x = halfWidth / 2;
 
-        // Сборка
-        this.group.add(leftMesh);
-        this.group.add(rightMesh);
-        this.group.position.set(0, 0.5, z);
+                this.group.add(leftMesh);
+                this.group.add(rightMesh);
+                this.group.position.set(0, 0.5, z);
 
-        scene.add(this.group);
-    }
+                scene.add(this.group);
+            }
 
-    intersects(player) {
-        return Math.abs(this.group.position.z - player.group.position.z) < 1
-            && Math.abs(player.posX - 0) < 1;
-    }
+            intersects(player) {
+                return Math.abs(this.group.position.z - player.group.position.z) < 1
+                    && Math.abs(player.posX - 0) < 1;
+            }
 
-    removeFromScene(scene) {
-        scene.remove(this.group);
-    }
-}
+            removeFromScene(scene) {
+                scene.remove(this.group);
+            }
+        }
 
 
         class Coin {
             constructor(scene, z) {
-                const geo = new THREE.SphereGeometry(0.3, 8, 8);
-                const mat = new THREE.MeshPhongMaterial({ color: 0xffff00 });
-                this.mesh = new THREE.Mesh(geo, mat);
-                this.mesh.position.set([-2, 0, 2][Math.floor(Math.random() * 3)], 0.5, z);
-                scene.add(this.mesh);
+                const geometry = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 5); // Подкорректировано под "монету"
+                const material = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+                this.cylinder = new THREE.Mesh(geometry, material); // ← сохраняем в this.cylinder
+
+                this.cylinder.rotation.x = Math.PI / 2; // чтобы выглядело как монета
+                this.cylinder.position.set([-2, 0, 2][Math.floor(Math.random() * 3)], 0.5, z);
+                scene.add(this.cylinder);
             }
 
             intersects(player) {
-                return player.mesh
-                    && Math.abs(this.mesh.position.z - player.group.position.z) < 1
-                    && Math.abs(this.mesh.position.x - player.posX) < 1;
+                return player.group && // игрок — это теперь .group
+                    Math.abs(this.cylinder.position.z - player.group.position.z) < 1 &&
+                    Math.abs(this.cylinder.position.x - player.posX) < 1;
             }
         }
+
 
         class Game {
             constructor() {
@@ -231,7 +243,7 @@
                     this.scene.background = texture;
                 });
                 this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
-                this.camera.position.set(0, 5, 5);
+                this.camera.position.set(0, 3, 3);
                 this.camera.lookAt(0, 0, -10);
 
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -243,7 +255,6 @@
                 this.scene.add(light);
                 this.scene.add(new THREE.AmbientLight(0x000000));
 
-                // Создаем плоскость для "земли"
                 const groundGeometry = new THREE.PlaneGeometry(5, 1000);
                 const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x555555, side: THREE.DoubleSide });
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
@@ -257,7 +268,7 @@
 
                 // Создаем несколько препятствий и монет
                 for (let i = 1; i <= 10; i++) {
-                    const z = -10 - i * 10;
+                    const z = -10 - i * 20;
                     const type = ["+", "-", "×"][i % 3];
                     const val = type == "+" ? 5 : (type == "-" ? 2 : 3);
                     this.gates.push(new Gate(this.scene, type, val, z));
@@ -275,6 +286,10 @@
                     if (e.code === "ArrowLeft") this.player.moveLeft();
                     if (e.code === "ArrowRight") this.player.moveRight();
                     if (e.code === "Space" || e.code === "ArrowUp") this.player.jump();
+                    if (e.code === 'ArrowDown') {
+                        this.player.isJumping = false;
+                        // this.speed = Math.max(0.01, this.speed - 0.01); // Уменьшаем скорость
+                    }
                 });
 
                 let touchStartX = 0, touchStartY = 0;
@@ -290,6 +305,8 @@
                     if (Math.abs(dx) > Math.abs(dy)) {
                         if (dx > 30) this.player.moveRight();
                         else if (dx < -30) this.player.moveLeft();
+                    } else {
+                        if (dy < -30) this.player.jump();
                     }
                 });
             }
@@ -303,31 +320,66 @@
             loop() {
                 requestAnimationFrame(() => this.loop());
 
-                // Двигаем камеру вперед
+                if (this.paused) return; // Stop updates while paused
+
+                // Move camera and chicken
                 this.camera.position.z -= this.speed;
                 this.player.group.position.z = this.camera.position.z - 5;
                 this.player.update();
 
-                // Двигаем ворота и монеты
+                // Move gates and coins
                 this.gates.forEach(gate => gate.group.position.z += this.speed);
-                this.coins.forEach(coin => coin.mesh.position.z += this.speed);
+                this.coins.forEach(coin => coin.cylinder.position.z += this.speed);
 
+                // Check gate collision
                 this.gates.forEach((gate, i) => {
-                    if (gate.intersects(this.player)) {
-                        this.scene.remove(gate.mesh);
+                    const dz = Math.abs(gate.group.position.z - this.player.group.position.z);
+                    if (dz < 0.5 && !this.paused) {
+                        this.pauseAndPrompt(gate);
                         this.gates.splice(i, 1);
                     }
                 });
 
+                // Coin check
                 this.coins.forEach((coin, i) => {
-                    if (coin.intersects(this.player)) {
-                        this.scene.remove(coin.mesh);
+                    if (
+                        Math.abs(coin.cylinder.position.z - this.player.group.position.z) < 0.5 &&
+                        Math.abs(coin.cylinder.position.x - this.player.group.position.x) < 0.5
+                    ) {
+                        this.scene.remove(coin.cylinder);
                         this.coins.splice(i, 1);
+                        this.player.score += 1;
+                        console.log("Coin collected! Score:", this.player.score);
                     }
                 });
 
                 this.renderer.render(this.scene, this.camera);
             }
+
+            pauseAndPrompt(gate) {
+                this.paused = true;
+                console.log(`Paused at gate: ${gate.type}${gate.value}`);
+
+                // Optionally: show UI (e.g. overlay "Choose Left or Right!")
+                // or change color of gate to flash / indicate choice
+
+                setTimeout(() => {
+                    // After 2 seconds, resume
+                    this.paused = false;
+
+                    // Example: apply gate effect
+                    if (gate.type === '+') {
+                        this.player.score += gate.value;
+                    } else if (gate.type === '-') {
+                        this.player.score -= gate.value;
+                    } else if (gate.type === '×') {
+                        this.player.score *= gate.value;
+                    }
+
+                    console.log(`Score after gate: ${this.player.score}`);
+                }, 2000);
+            }
+
         }
 
         new Game();
